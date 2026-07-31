@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MT论坛签到助手</string>
+    <string name="add_account">添加账号</string>
+    <string name="sign_in">签到</string>
+    <string name="sign_in_all">全部签到</string>
+    <string name="accounts">账号管理</string>
+    <string name="settings">设置</string>
+    <string name="username">用户名</string>
+    <string name="password">密码</string>
+    <string name="enable">启用</string>
+    <string name="disable">禁用</string>
+    <string name="delete">删除</string>
+    <string name="cancel">取消</string>
+    <string name="confirm">确认</string>
+    <string name="refresh">刷新</string>
+    <string name="no_accounts">暂无账号</string>
+    <string name="add_account_hint">点击右下角+添加账号</string>
+    <string name="sign_in_success">签到成功</string>
+    <string name="sign_in_failed">签到失败</string>
+    <string name="signing_in">正在签到...</string>
+    <string name="sign_in_complete">签到完成</string>
+    <string name="delete_confirm">确定要删除此账号吗？</string>
+    <string name="password_encrypted">密码将使用Android KeyStore加密存储</string>
+</resources>
