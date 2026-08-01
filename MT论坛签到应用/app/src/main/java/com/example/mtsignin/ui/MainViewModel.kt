@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.example.mtsignin.data.local.AccountEntity
 import com.example.mtsignin.data.model.SignInResult
 import com.example.mtsignin.data.repository.SignRepository
-import com.example.mtsignin.util.CryptoUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -28,8 +27,7 @@ class MainViewModel @Inject constructor(
 
     fun addAccount(username: String, password: String) {
         viewModelScope.launch {
-            val encryptedPassword = CryptoUtils.encrypt(password)
-            repository.addAccount(username, encryptedPassword)
+            repository.addAccount(username, password)
         }
     }
 

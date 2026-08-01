@@ -2,8 +2,8 @@ package com.example.mtsignin.data.repository
 
 import com.example.mtsignin.data.local.AccountDao
 import com.example.mtsignin.data.local.AccountEntity
+import com.example.mtsignin.data.model.SignInResult
 import com.example.mtsignin.network.MTForumApi
-import com.example.mtsignin.network.SignInResult
 import com.example.mtsignin.util.CryptoUtils
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
@@ -15,6 +15,8 @@ class SignRepository @Inject constructor(
     private val accountDao: AccountDao
 ) {
     val accounts: Flow<List<AccountEntity>> = accountDao.getAll()
+
+    fun getAllAccounts(): Flow<List<AccountEntity>> = accountDao.getAll()
     
     /**
      * 添加账号

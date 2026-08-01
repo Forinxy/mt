@@ -62,10 +62,20 @@ class SignInWorker @AssistedInject constructor(
         val title = "MT论坛签到完成"
         val message = "成功: $successCount, 失败: $failCount"
 
-        // 使用现代API显示通知
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        val channelId = "sign_in_channel"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                channelId,
+                "签到通知",
+                android.app.NotificationManager.IMPORTANCE_DEFAULT
+            )
+            manager.createNotificationChannel(channel)
+        }
+
         val notification = androidx.core.app.NotificationCompat.Builder(
             context,
-            "sign_in_channel"
+            channelId
         )
             .setSmallIcon(android.R.drawable.stat_notify_more)
             .setContentTitle(title)
@@ -74,16 +84,7 @@ class SignInWorker @AssistedInject constructor(
             .setAutoCancel(true)
             .build()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            androidx.core.app.NotificationManagerCompat.from(context).notify(
-                1001,
-                notification
-            )
-        } else {
-            @Suppress("DEPRECATION")
-            val serviceFlags = 0
-            android.app.NotificationManager.Policy()
-        }
+        androidx.core.app.NotificationManagerCompat.from(context).notify(1001, notification)
     }
 
     companion object {

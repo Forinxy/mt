@@ -80,7 +80,7 @@ fun AccountListItem(
             // 展开详情
             if (expanded) {
                 Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider()
+                Divider()
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // 签到状态
