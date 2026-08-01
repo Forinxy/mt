@@ -52,6 +52,12 @@ class MTForumApi(client: OkHttpClient) {
     private val cookieManager = java.net.CookieManager()
     private val cookieJar = JavaNetCookieJar(cookieManager)
 
+    /**
+     * 最近一次登录成功捕获的会话 token（形如 xxx_auth=...，或完整 cookie 串），供复制分享
+     */
+    var lastToken: String? = null
+        private set
+
     private val client = client.newBuilder()
         .cookieJar(cookieJar)
         .addInterceptor { chain ->
@@ -97,6 +103,7 @@ class MTForumApi(client: OkHttpClient) {
             }
 
             val nickname = extractValue(loginResult, "欢迎您回来，(.*?)，现在") ?: username
+            captureToken()
 
             // 3. 获取签到页面
             val signPageHtml = getSignPage()
@@ -177,6 +184,7 @@ class MTForumApi(client: OkHttpClient) {
             }
 
             val nickname = extractValue(loginResult, "欢迎您回来，(.*?)，现在") ?: username
+            captureToken()
 
             // 3. 获取签到页面
             val signPageHtml = getSignPage()
@@ -295,6 +303,23 @@ class MTForumApi(client: OkHttpClient) {
     private fun getCookie(name: String): String? {
         return try {
             cookieManager.cookieStore.get(URI(BASE_URL)).firstOrNull { it.name == name }?.value
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * 捕获登录后的会话 token。
+     *
+     * Discuz 登录后 cookie 中关键的认证字段名通常以 `_auth` 结尾（如 `xxx_auth`）。
+     * 找不到时退化为保存完整 cookie 串，保证有内容可复制。
+     */
+    private fun captureToken() {
+        lastToken = try {
+            val cookies = cookieManager.cookieStore.get(URI(BASE_URL))
+            val auth = cookies.firstOrNull { it.name.endsWith("_auth") }
+            auth?.let { "${it.name}=${it.value}" }
+                ?: cookies.joinToString("; ") { "${it.name}=${it.value}" }.ifEmpty { null }
         } catch (e: Exception) {
             null
         }

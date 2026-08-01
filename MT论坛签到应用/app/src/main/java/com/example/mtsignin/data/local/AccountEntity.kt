@@ -14,6 +14,7 @@ data class AccountEntity(
     val lastSignInStatus: String? = null,
     val lastSignInRanking: String? = null,
     val lastSignInReward: String? = null,
+    val lastToken: String? = null,
     val isEnabled: Boolean = true,
     val createTime: Long = System.currentTimeMillis()
 )

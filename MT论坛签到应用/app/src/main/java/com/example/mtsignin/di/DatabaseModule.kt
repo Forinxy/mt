@@ -25,6 +25,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             "mt_signin.db"
         )
+            .addMigrations(AppDatabase.MIGRATION_1_2)
             .fallbackToDestructiveMigration()
             .build()
     }

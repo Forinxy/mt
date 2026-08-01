@@ -1,5 +1,7 @@
 package com.example.mtsignin.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -13,7 +15,7 @@ import com.example.mtsignin.data.local.AccountEntity
 import java.text.SimpleDateFormat
 import java.util.*
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun AccountListItem(
     account: AccountEntity,
@@ -21,13 +23,18 @@ fun AccountListItem(
     onToggleEnabled: () -> Unit,
     onDelete: () -> Unit,
     onRefreshRanking: () -> Unit = {},
-    isRefreshingRanking: Boolean = false
+    isRefreshingRanking: Boolean = false,
+    onCopyToken: () -> Unit = {}
 ) {
     var expanded by remember { mutableStateOf(false) }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = { expanded = !expanded }
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = { expanded = !expanded },
+                onLongClick = onCopyToken
+            )
     ) {
         Column(
             modifier = Modifier
@@ -84,6 +91,13 @@ fun AccountListItem(
                 Spacer(modifier = Modifier.height(12.dp))
                 Divider()
                 Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    "长按卡片可复制账号Token",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                Spacer(modifier = Modifier.height(4.dp))
 
                 // 签到状态
                 if (account.lastSignInTime != null) {

@@ -9,8 +9,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import com.example.mtsignin.data.local.AccountEntity
 import com.example.mtsignin.data.model.SignInResult
 import java.text.SimpleDateFormat
@@ -25,6 +29,24 @@ fun MainScreen(
     val signInState by viewModel.signInState.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf<AccountEntity?>(null) }
+    var copyMessage by remember { mutableStateOf<String?>(null) }
+
+    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    fun copyToClipboard(label: String, text: String) {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
+        copyMessage = "$label 已复制"
+    }
+
+    // 复制提示通过 Snackbar 展示
+    LaunchedEffect(copyMessage) {
+        copyMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            copyMessage = null
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -36,6 +58,7 @@ fun MainScreen(
                 )
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showAddDialog = true },
@@ -54,7 +77,8 @@ fun MainScreen(
             SignInStatusCard(
                 signInState = signInState,
                 onSignInAll = { viewModel.signInAll() },
-                onRefresh = { viewModel.refresh() }
+                onRefresh = { viewModel.refresh() },
+                onRefreshAllRankings = { viewModel.refreshAllRankings() }
             )
 
             // 账号列表
@@ -96,7 +120,15 @@ fun MainScreen(
                             onToggleEnabled = { viewModel.toggleAccountEnabled(account) },
                             onDelete = { showDeleteConfirm = account },
                             onRefreshRanking = { viewModel.refreshRanking(account) },
-                            isRefreshingRanking = signInState.isRefreshingRanking
+                            isRefreshingRanking = signInState.isRefreshingRanking,
+                            onCopyToken = {
+                                val token = account.lastToken
+                                if (!token.isNullOrBlank()) {
+                                    copyToClipboard("账号Token", token)
+                                } else {
+                                    copyMessage = "该账号暂无Token，请先签到"
+                                }
+                            }
                         )
                     }
                 }
@@ -144,7 +176,8 @@ fun MainScreen(
 fun SignInStatusCard(
     signInState: SignInUiState,
     onSignInAll: () -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onRefreshAllRankings: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -210,9 +243,18 @@ fun SignInStatusCard(
                     IconButton(onClick = onRefresh) {
                         Icon(Icons.Default.Refresh, contentDescription = "刷新")
                     }
+                    OutlinedButton(
+                        onClick = onRefreshAllRankings,
+                        enabled = !signInState.isSigningIn && !signInState.isRefreshingRanking
+                    ) {
+                        Icon(Icons.Default.BarChart, contentDescription = null)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("全部刷新排名")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = onSignInAll,
-                        enabled = !signInState.isSigningIn
+                        enabled = !signInState.isSigningIn && !signInState.isRefreshingRanking
                     ) {
                         Icon(Icons.Default.Check, contentDescription = null)
                         Spacer(modifier = Modifier.width(4.dp))

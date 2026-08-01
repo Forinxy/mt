@@ -42,7 +42,7 @@ class SignRepository @Inject constructor(
         }
         
         val result = api.signIn(account.username, password)
-        
+
         // 更新签到状态
         when (result) {
             is SignInResult.Success -> {
@@ -52,7 +52,8 @@ class SignRepository @Inject constructor(
                         lastSignInTime = System.currentTimeMillis(),
                         lastSignInStatus = result.status,
                         lastSignInRanking = result.ranking,
-                        lastSignInReward = result.reward
+                        lastSignInReward = result.reward,
+                        lastToken = api.lastToken ?: account.lastToken
                     )
                 )
             }
@@ -65,7 +66,12 @@ class SignRepository @Inject constructor(
                 )
             }
         }
-        
+
+        // 签到成功后若排名未获取到（"未知"），自动补查一次排名，保证签到后即可看到排名
+        if (result is SignInResult.Success && result.ranking == "未知") {
+            refreshRanking(account)
+        }
+
         return result
     }
     
@@ -106,7 +112,8 @@ class SignRepository @Inject constructor(
                 accountDao.update(
                     account.copy(
                         nickname = result.username,
-                        lastSignInRanking = if (result.isSignedToday) result.ranking else null
+                        lastSignInRanking = if (result.isSignedToday) result.ranking else null,
+                        lastToken = api.lastToken ?: account.lastToken
                     )
                 )
             }

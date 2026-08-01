@@ -124,6 +124,33 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    /**
+     * 并发刷新所有启用账号的排名
+     */
+    fun refreshAllRankings() {
+        val targets = accounts.value.filter { it.isEnabled }
+        if (targets.isEmpty()) return
+
+        viewModelScope.launch {
+            _signInState.update {
+                it.copy(isRefreshingRanking = true, error = null)
+            }
+
+            val results = targets.map { account ->
+                repository.refreshRanking(account)
+            }
+
+            val firstError = results.filterIsInstance<RankingResult.Error>().firstOrNull()
+
+            _signInState.update {
+                it.copy(
+                    isRefreshingRanking = false,
+                    error = firstError?.message
+                )
+            }
+        }
+    }
+
     fun refresh() {
         viewModelScope.launch {
             _signInState.update {
