@@ -77,7 +77,6 @@ fun MainScreen(
             SignInStatusCard(
                 signInState = signInState,
                 onSignInAll = { viewModel.signInAll() },
-                onRefresh = { viewModel.refresh() },
                 onRefreshAllRankings = { viewModel.refreshAllRankings() }
             )
 
@@ -176,7 +175,6 @@ fun MainScreen(
 fun SignInStatusCard(
     signInState: SignInUiState,
     onSignInAll: () -> Unit,
-    onRefresh: () -> Unit,
     onRefreshAllRankings: () -> Unit
 ) {
     Card(
@@ -239,16 +237,11 @@ fun SignInStatusCard(
                     }
                 }
 
-                Row {
-                    IconButton(onClick = onRefresh) {
-                        Icon(Icons.Default.Refresh, contentDescription = "刷新")
-                    }
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedButton(
                         onClick = onRefreshAllRankings,
                         enabled = !signInState.isSigningIn && !signInState.isRefreshingRanking
                     ) {
-                        Icon(Icons.Default.BarChart, contentDescription = null)
-                        Spacer(modifier = Modifier.width(4.dp))
                         Text("全部刷新排名")
                     }
                     Spacer(modifier = Modifier.width(8.dp))
@@ -256,8 +249,6 @@ fun SignInStatusCard(
                         onClick = onSignInAll,
                         enabled = !signInState.isSigningIn && !signInState.isRefreshingRanking
                     ) {
-                        Icon(Icons.Default.Check, contentDescription = null)
-                        Spacer(modifier = Modifier.width(4.dp))
                         Text("全部签到")
                     }
                 }
