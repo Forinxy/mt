@@ -5,7 +5,8 @@ local-repo/
 .idea/
 *.iml
 .DS_Store
-*.apk
+**/dist/*.apk
+app/**/build/outputs/**/*.apk
 captures/
 .externalNativeBuild/
 .cxx/
