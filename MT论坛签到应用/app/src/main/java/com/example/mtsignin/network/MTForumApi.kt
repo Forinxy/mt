@@ -1,5 +1,6 @@
 package com.example.mtsignin.network
 
+import com.example.mtsignin.data.model.RankingResult
 import com.example.mtsignin.data.model.SignInResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -23,6 +24,7 @@ import java.util.regex.Pattern
  * - Discuz 的 loginhash 由服务端生成并写入 cookie，同时出现在登录表单 action 中（`loginhash=xxx&inajax=1`）
  * - loginhash 缺失时 Discuz 并不强制校验，登录仍可成功，因此提取失败不应阻断流程
  * - 已签到判断同时覆盖签到页面文案与签到接口返回两种来源
+ * - 排名（ranking）来自签到页"您的签到排名"文案，可在不执行签到的情况下单独查询（[fetchRanking]）
  */
 class MTForumApi(client: OkHttpClient) {
 
@@ -142,6 +144,58 @@ class MTForumApi(client: OkHttpClient) {
             )
         } catch (e: Exception) {
             SignInResult.Error(e.message ?: "网络错误")
+        }
+    }
+
+    /**
+     * 仅查询今日签到排名，不执行签到。
+     *
+     * 流程：登录 -> 获取签到页 -> 解析"您的签到排名" -> 退出登录。
+     * 今日已签到则返回排名；今日未签到则返回 isSignedToday=false。
+     */
+    suspend fun fetchRanking(username: String, password: String): RankingResult = withContext(Dispatchers.IO) {
+        try {
+            // 1. 获取登录页面
+            val loginPageHtml = getLoginPage()
+
+            val loginhash = extractLoginhash(loginPageHtml)
+            val formhash = extractValue(loginPageHtml, "formhash\" value=\"(.*?)\"")
+                ?: return@withContext RankingResult.Error("获取formhash失败")
+
+            // 2. 执行登录
+            val loginResult = login(loginhash, formhash, username, password)
+
+            if (!isLoginSuccess(loginResult)) {
+                val errorMsg = when {
+                    loginResult.contains("密码错误") || loginResult.contains("用户名错误") || loginResult.contains("不存在") ->
+                        "用户名或密码错误"
+                    loginResult.contains("验证码") || loginResult.contains("seccode") ->
+                        "登录需要验证码"
+                    else -> "登录失败，请检查网络"
+                }
+                return@withContext RankingResult.Error(errorMsg)
+            }
+
+            val nickname = extractValue(loginResult, "欢迎您回来，(.*?)，现在") ?: username
+
+            // 3. 获取签到页面
+            val signPageHtml = getSignPage()
+            val signFormhash = extractValue(signPageHtml, "formhash\" value=\"(.*?)\"")
+                ?: return@withContext RankingResult.Error("获取签到formhash失败")
+
+            // 4. 解析排名
+            val ranking = extractValue(signPageHtml, "您的签到排名：(.*?)</div>")?.trim()
+
+            // 5. 退出登录
+            logout(signFormhash)
+
+            if (ranking.isNullOrEmpty()) {
+                RankingResult.Success(username = nickname, ranking = "", isSignedToday = false)
+            } else {
+                RankingResult.Success(username = nickname, ranking = ranking, isSignedToday = true)
+            }
+        } catch (e: Exception) {
+            RankingResult.Error(e.message ?: "网络错误")
         }
     }
 

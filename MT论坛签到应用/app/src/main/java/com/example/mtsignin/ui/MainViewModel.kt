@@ -3,6 +3,7 @@ package com.example.mtsignin.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mtsignin.data.local.AccountEntity
+import com.example.mtsignin.data.model.RankingResult
 import com.example.mtsignin.data.model.SignInResult
 import com.example.mtsignin.data.repository.SignRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -99,6 +100,26 @@ class MainViewModel @Inject constructor(
 
             _signInState.update {
                 it.copy(isSigningIn = false)
+            }
+        }
+    }
+
+    fun refreshRanking(account: AccountEntity) {
+        viewModelScope.launch {
+            _signInState.update {
+                it.copy(isRefreshingRanking = true, error = null)
+            }
+
+            val result = repository.refreshRanking(account)
+
+            _signInState.update {
+                it.copy(
+                    isRefreshingRanking = false,
+                    error = when (result) {
+                        is RankingResult.Error -> result.message
+                        is RankingResult.Success -> null
+                    }
+                )
             }
         }
     }

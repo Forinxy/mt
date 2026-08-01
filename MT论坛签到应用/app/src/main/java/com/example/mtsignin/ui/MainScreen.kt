@@ -94,7 +94,9 @@ fun MainScreen(
                             account = account,
                             onSignIn = { viewModel.signInOne(account) },
                             onToggleEnabled = { viewModel.toggleAccountEnabled(account) },
-                            onDelete = { showDeleteConfirm = account }
+                            onDelete = { showDeleteConfirm = account },
+                            onRefreshRanking = { viewModel.refreshRanking(account) },
+                            isRefreshingRanking = signInState.isRefreshingRanking
                         )
                     }
                 }
@@ -233,6 +235,7 @@ fun SignInStatusCard(
 
 data class SignInUiState(
     val isSigningIn: Boolean = false,
+    val isRefreshingRanking: Boolean = false,
     val successCount: Int = 0,
     val failCount: Int = 0,
     val error: String? = null,

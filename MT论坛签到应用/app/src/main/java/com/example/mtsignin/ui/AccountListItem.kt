@@ -19,7 +19,9 @@ fun AccountListItem(
     account: AccountEntity,
     onSignIn: () -> Unit,
     onToggleEnabled: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onRefreshRanking: () -> Unit = {},
+    isRefreshingRanking: Boolean = false
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -139,6 +141,30 @@ fun AccountListItem(
                                 }
                             )
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // 刷新排名
+                    OutlinedButton(
+                        onClick = onRefreshRanking,
+                        enabled = account.isEnabled && !isRefreshingRanking,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (isRefreshingRanking) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(if (isRefreshingRanking) "正在刷新排名..." else "刷新排名")
                     }
                 }
 

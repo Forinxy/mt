@@ -2,6 +2,7 @@ package com.example.mtsignin.data.repository
 
 import com.example.mtsignin.data.local.AccountDao
 import com.example.mtsignin.data.local.AccountEntity
+import com.example.mtsignin.data.model.RankingResult
 import com.example.mtsignin.data.model.SignInResult
 import com.example.mtsignin.network.MTForumApi
 import com.example.mtsignin.util.CryptoUtils
@@ -88,6 +89,35 @@ class SignRepository @Inject constructor(
         return results
     }
     
+    /**
+     * 刷新单个账号的今日签到排名（仅查询，不执行签到）
+     */
+    suspend fun refreshRanking(account: AccountEntity): RankingResult {
+        val password = try {
+            CryptoUtils.decrypt(account.passwordEncrypted)
+        } catch (e: Exception) {
+            return RankingResult.Error("密码解密失败")
+        }
+
+        val result = api.fetchRanking(account.username, password)
+
+        when (result) {
+            is RankingResult.Success -> {
+                accountDao.update(
+                    account.copy(
+                        nickname = result.username,
+                        lastSignInRanking = if (result.isSignedToday) result.ranking else null
+                    )
+                )
+            }
+            is RankingResult.Error -> {
+                // 刷新失败不覆盖原有签到状态，仅保留错误信息供 UI 提示
+            }
+        }
+
+        return result
+    }
+
     /**
      * 删除账号
      */
