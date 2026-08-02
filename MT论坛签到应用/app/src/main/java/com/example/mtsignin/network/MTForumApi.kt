@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.*
 import okhttp3.logging.HttpLoggingInterceptor
+import java.io.IOException
 import java.net.URI
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
@@ -65,15 +66,21 @@ class MTForumApi(client: OkHttpClient) {
                 .header("User-Agent", USER_AGENT)
                 .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
                 .header("Accept-Language", "zh-CN,zh;q=0.9")
+                // 关闭 keep-alive 连接复用，避免论坛服务器提前断开连接导致 unexpected end of stream
+                .header("Connection", "close")
                 .build()
             chain.proceed(request)
         }
+        // 对 IOException（含 unexpected end of stream）自动重试，签到请求重复提交无副作用
+        .addInterceptor(IOExceptionRetryInterceptor(maxAttempts = 3))
         .addInterceptor(HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BASIC
         })
         .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
         .followRedirects(true)
+        // 仅使用 HTTP/1.1，规避服务器/中间层对 keep-alive 与 HTTP/2 支持不稳导致的断流
+        .protocols(listOf(Protocol.HTTP_1_1))
         .build()
 
     /**
@@ -329,5 +336,29 @@ class MTForumApi(client: OkHttpClient) {
         val p = Pattern.compile(pattern)
         val m = p.matcher(html)
         return if (m.find()) m.group(1) else null
+    }
+}
+
+/**
+ * 针对 IOException（含 unexpected end of stream）自动重试的拦截器。
+ * 签到流程的请求（取页面、登录、签到、退出）均幂等，重复提交不会产生副作用。
+ */
+private class IOExceptionRetryInterceptor(
+    private val maxAttempts: Int = 3
+) : Interceptor {
+
+    override fun intercept(chain: Interceptor.Chain): Response {
+        var attempt = 0
+        var lastError: IOException? = null
+
+        while (attempt < maxAttempts) {
+            try {
+                return chain.proceed(chain.request())
+            } catch (e: IOException) {
+                lastError = e
+                attempt++
+            }
+        }
+        throw lastError ?: IOException("请求失败")
     }
 }
