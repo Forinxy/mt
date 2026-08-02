@@ -50,15 +50,22 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             _signInState.update { it.copy(isSigningIn = true) }
 
-            val result = repository.signInOne(account)
+            try {
+                val result = repository.signInOne(account)
 
-            _signInState.update {
-                it.copy(
-                    isSigningIn = false,
-                    successCount = if (result is SignInResult.Success) it.successCount + 1 else it.successCount,
-                    failCount = if (result is SignInResult.Error) it.failCount + 1 else it.failCount,
-                    error = if (result is SignInResult.Error) result.message else null
-                )
+                _signInState.update {
+                    it.copy(
+                        successCount = if (result is SignInResult.Success) it.successCount + 1 else it.successCount,
+                        failCount = if (result is SignInResult.Error) it.failCount + 1 else it.failCount,
+                        error = if (result is SignInResult.Error) result.message else null
+                    )
+                }
+            } catch (e: Exception) {
+                _signInState.update {
+                    it.copy(error = e.message ?: "签到失败")
+                }
+            } finally {
+                _signInState.update { it.copy(isSigningIn = false) }
             }
         }
     }
@@ -76,35 +83,45 @@ class MainViewModel @Inject constructor(
                 )
             }
 
-            val results = repository.signInAll { done, total ->
+            try {
+                val results = repository.signInAll { done, total ->
+                    _signInState.update {
+                        it.copy(
+                            currentProgress = done,
+                            totalCount = total
+                        )
+                    }
+                }
+
+                var successCount = 0
+                var failCount = 0
+
+                results.forEach { (_, result) ->
+                    if (result is SignInResult.Success) {
+                        successCount++
+                    } else {
+                        failCount++
+                    }
+                }
+
                 _signInState.update {
                     it.copy(
-                        currentProgress = done,
-                        totalCount = total
+                        successCount = successCount,
+                        failCount = failCount
+                    )
+                }
+            } catch (e: Exception) {
+                _signInState.update {
+                    it.copy(error = e.message ?: "签到失败")
+                }
+            } finally {
+                _signInState.update {
+                    it.copy(
+                        isSigningIn = false,
+                        currentProgress = accounts.value.count { acc -> acc.isEnabled }
                     )
                 }
             }
-
-            var successCount = 0
-            var failCount = 0
-
-            results.forEach { (_, result) ->
-                if (result is SignInResult.Success) {
-                    successCount++
-                } else {
-                    failCount++
-                }
-            }
-
-            _signInState.update {
-                it.copy(
-                    isSigningIn = false,
-                    currentProgress = results.size,
-                    successCount = successCount,
-                    failCount = failCount
-                )
-            }
-        }
     }
 
     fun refreshRanking(account: AccountEntity) {

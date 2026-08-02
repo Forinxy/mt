@@ -33,13 +33,18 @@ class MTForumApi(client: OkHttpClient) {
         const val BASE_URL = "https://bbs.binmt.cc/"
         private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
-        /** 已签到判定关键词（签到页面文案） */
+        /** 已签到判定关键词（签到页面文案/签到接口返回） */
         private val ALREADY_SIGNED_KEYWORDS = listOf(
             "今日已签",
             "今日已经签到",
             "您今天已经签到过了",
             "您已经签到过了",
-            "已经签到过"
+            "已经签到过",
+            "已经签到",
+            "重复签到",
+            "请勿重复",
+            "请不要重复",
+            "签到过了"
         )
 
         /** 登录成功标志（Discuz AJAX 模式返回 succeed，非 AJAX 模式返回 欢迎您回来） */
@@ -72,12 +77,13 @@ class MTForumApi(client: OkHttpClient) {
             chain.proceed(request)
         }
         // 对 IOException（含 unexpected end of stream）自动重试，签到请求重复提交无副作用
-        .addInterceptor(IOExceptionRetryInterceptor(maxAttempts = 3))
+        .addInterceptor(IOExceptionRetryInterceptor(maxAttempts = 2))
         .addInterceptor(HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BASIC
         })
         .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .callTimeout(45, TimeUnit.SECONDS)
         .followRedirects(true)
         // 仅使用 HTTP/1.1，规避服务器/中间层对 keep-alive 与 HTTP/2 支持不稳导致的断流
         .protocols(listOf(Protocol.HTTP_1_1))

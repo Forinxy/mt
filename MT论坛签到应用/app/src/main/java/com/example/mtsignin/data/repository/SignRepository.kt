@@ -13,6 +13,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
@@ -23,8 +24,11 @@ class SignRepository @Inject constructor(
     private val client: OkHttpClient,
     private val accountDao: AccountDao
 ) {
-    /** 并发签到时的最大并发数，避免同时发起过多请求对论坛造成压力 */
-    private val signInSemaphore = Semaphore(5)
+    /** 并发签到时的最大并发数。并发过高易触发论坛 WAF 限流，取较小值保证稳定 */
+    private val signInSemaphore = Semaphore(3)
+
+    /** 单个账号签到的超时保护，避免个别账号卡住导致整体一直转圈 */
+    private val accountTimeoutMillis = 120_000L
 
     val accounts: Flow<List<AccountEntity>> = accountDao.getAll()
 
@@ -69,7 +73,14 @@ class SignRepository @Inject constructor(
             accounts.map { account ->
                 async(Dispatchers.IO) {
                     val result = signInSemaphore.withPermit {
-                        signInOneWith(account, newApi())
+                        try {
+                            // 单账号超时保护：超时按失败处理，保证批量签到能正常收尾
+                            withTimeoutOrNull(accountTimeoutMillis) {
+                                signInOneWith(account, newApi())
+                            } ?: SignInResult.Error("签到超时")
+                        } catch (e: Exception) {
+                            SignInResult.Error(e.message ?: "签到异常")
+                        }
                     }
                     val done = doneCount.incrementAndGet()
                     onProgress(done, accounts.size)
@@ -99,16 +110,21 @@ class SignRepository @Inject constructor(
         // 更新签到状态
         when (result) {
             is SignInResult.Success -> {
-                accountDao.update(
-                    account.copy(
-                        nickname = result.username,
-                        lastSignInTime = System.currentTimeMillis(),
-                        lastSignInStatus = result.status,
-                        lastSignInRanking = result.ranking,
-                        lastSignInReward = result.reward,
-                        lastToken = api.lastToken ?: account.lastToken
-                    )
+                val updated = account.copy(
+                    nickname = result.username,
+                    lastSignInTime = System.currentTimeMillis(),
+                    lastSignInStatus = result.status,
+                    lastSignInRanking = result.ranking,
+                    lastSignInReward = result.reward,
+                    lastToken = api.lastToken ?: account.lastToken
                 )
+                accountDao.update(updated)
+
+                // 签到成功后若排名未获取到（"未知"），自动补查一次排名，保证签到后即可看到排名。
+                // 传入更新后的实体，避免补查时用旧实体覆盖刚写入的签到时间/状态
+                if (result.ranking == "未知") {
+                    refreshRankingWith(updated, api)
+                }
             }
             is SignInResult.Error -> {
                 accountDao.update(
@@ -118,11 +134,6 @@ class SignRepository @Inject constructor(
                     )
                 )
             }
-        }
-
-        // 签到成功后若排名未获取到（"未知"），自动补查一次排名，保证签到后即可看到排名
-        if (result is SignInResult.Success && result.ranking == "未知") {
-            refreshRankingWith(account, api)
         }
 
         return result
@@ -149,11 +160,13 @@ class SignRepository @Inject constructor(
 
         when (result) {
             is RankingResult.Success -> {
+                // 基于数据库最新记录更新，避免覆盖签到/其他操作刚写入的状态与时间
+                val latest = accountDao.getById(account.id) ?: account
                 accountDao.update(
-                    account.copy(
+                    latest.copy(
                         nickname = result.username,
                         lastSignInRanking = if (result.isSignedToday) result.ranking else null,
-                        lastToken = api.lastToken ?: account.lastToken
+                        lastToken = api.lastToken ?: latest.lastToken
                     )
                 )
             }
