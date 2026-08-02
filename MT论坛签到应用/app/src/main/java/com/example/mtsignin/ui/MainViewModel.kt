@@ -122,6 +122,7 @@ class MainViewModel @Inject constructor(
                     )
                 }
             }
+        }
     }
 
     fun refreshRanking(account: AccountEntity) {
