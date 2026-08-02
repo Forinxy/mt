@@ -15,6 +15,8 @@ data class AccountEntity(
     val lastSignInRanking: String? = null,
     val lastSignInReward: String? = null,
     val lastToken: String? = null,
+    /** 最近一次成功查询排名的日期（yyyy-MM-dd），用于同一天内去重，避免重复请求触发风控 */
+    val lastRankingQueryDate: String? = null,
     val isEnabled: Boolean = true,
     val createTime: Long = System.currentTimeMillis()
 )

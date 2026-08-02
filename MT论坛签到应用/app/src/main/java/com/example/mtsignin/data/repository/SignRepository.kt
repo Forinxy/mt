@@ -15,6 +15,9 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -99,6 +102,17 @@ class SignRepository @Inject constructor(
      * 签到单个账号（使用指定的 API 实例）
      */
     private suspend fun signInOneWith(account: AccountEntity, api: MTForumApi): SignInResult {
+        // 本地去重：当天已成功签到过则直接返回本地记录结果，不再发起网络请求，
+        // 避免同一账号一天内重复请求触发论坛风控
+        if (isSignedToday(account)) {
+            return SignInResult.Success(
+                username = account.nickname ?: account.username,
+                status = account.lastSignInStatus ?: "今日已签",
+                ranking = account.lastSignInRanking ?: "未知",
+                reward = account.lastSignInReward ?: "0"
+            )
+        }
+
         val password = try {
             CryptoUtils.decrypt(account.passwordEncrypted)
         } catch (e: Exception) {
@@ -150,6 +164,17 @@ class SignRepository @Inject constructor(
      * 刷新单个账号的今日签到排名（使用指定的 API 实例）
      */
     private suspend fun refreshRankingWith(account: AccountEntity, api: MTForumApi): RankingResult {
+        // 本地去重：当天已成功查询过排名则直接返回本地记录结果，不再发起网络请求，
+        // 避免同一账号一天内重复查询触发论坛风控
+        if (isRankingQueriedToday(account)) {
+            val ranking = account.lastSignInRanking ?: ""
+            return RankingResult.Success(
+                username = account.nickname ?: account.username,
+                ranking = ranking,
+                isSignedToday = ranking.isNotEmpty()
+            )
+        }
+
         val password = try {
             CryptoUtils.decrypt(account.passwordEncrypted)
         } catch (e: Exception) {
@@ -166,7 +191,8 @@ class SignRepository @Inject constructor(
                     latest.copy(
                         nickname = result.username,
                         lastSignInRanking = if (result.isSignedToday) result.ranking else null,
-                        lastToken = api.lastToken ?: latest.lastToken
+                        lastToken = api.lastToken ?: latest.lastToken,
+                        lastRankingQueryDate = todayDateString()
                     )
                 )
             }
@@ -198,4 +224,32 @@ class SignRepository @Inject constructor(
     suspend fun updateAccount(account: AccountEntity) {
         accountDao.update(account)
     }
+
+    /**
+     * 判断该账号当天是否已成功签到（依据本地记录，不触发网络请求）。
+     * 仅当最近一次签到发生在今天、且状态为成功类文案（已签/成功/完成）时视为已签到
+     */
+    private fun isSignedToday(account: AccountEntity): Boolean {
+        val time = account.lastSignInTime ?: return false
+        if (!isSameDay(time, System.currentTimeMillis())) return false
+        val status = account.lastSignInStatus ?: return false
+        return status.contains("已签") || status.contains("成功") || status.contains("完成")
+    }
+
+    /**
+     * 判断该账号当天是否已查询过排名（依据本地记录，不触发网络请求）
+     */
+    private fun isRankingQueriedToday(account: AccountEntity): Boolean {
+        val date = account.lastRankingQueryDate ?: return false
+        return date == todayDateString()
+    }
+
+    private fun isSameDay(t1: Long, t2: Long): Boolean =
+        dateString(t1) == dateString(t2)
+
+    private fun dateString(millis: Long): String =
+        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(millis))
+
+    private fun todayDateString(): String =
+        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 }
