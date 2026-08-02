@@ -1,6 +1,5 @@
 package com.example.mtsignin.di
 
-import com.example.mtsignin.network.MTForumApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -24,11 +23,5 @@ object AppModule {
             .followSslRedirects(true)
             .retryOnConnectionFailure(true)
             .build()
-    }
-
-    @Provides
-    @Singleton
-    fun provideMTForumApi(client: OkHttpClient): MTForumApi {
-        return MTForumApi(client)
     }
 }

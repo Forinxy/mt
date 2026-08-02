@@ -9,12 +9,9 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.example.mtsignin.data.local.AccountEntity
 import com.example.mtsignin.data.repository.SignRepository
-import com.example.mtsignin.util.CryptoUtils
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
-import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 
 @HiltWorker
@@ -26,27 +23,22 @@ class SignInWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         try {
-            // 获取所有启用的账号
-            val accounts = repository.getAllAccounts().first().filter { it.isEnabled }
+            // 并行签到所有启用的账号
+            val results = repository.signInAll()
 
-            if (accounts.isEmpty()) {
+            if (results.isEmpty()) {
                 return Result.success()
             }
 
             var successCount = 0
             var failCount = 0
 
-            accounts.forEach { account ->
-                val result = repository.signInOne(account)
-
+            results.forEach { (_, result) ->
                 if (result.isSuccess()) {
                     successCount++
                 } else {
                     failCount++
                 }
-
-                // 间隔1秒避免请求过快
-                Thread.sleep(1000)
             }
 
             // 发送通知

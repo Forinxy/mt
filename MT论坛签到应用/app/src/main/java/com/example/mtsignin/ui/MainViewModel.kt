@@ -76,30 +76,33 @@ class MainViewModel @Inject constructor(
                 )
             }
 
-            val results = repository.signInAll()
+            val results = repository.signInAll { done, total ->
+                _signInState.update {
+                    it.copy(
+                        currentProgress = done,
+                        totalCount = total
+                    )
+                }
+            }
 
             var successCount = 0
             var failCount = 0
 
-            results.forEachIndexed { index, pair ->
-                val result = pair.second
+            results.forEach { (_, result) ->
                 if (result is SignInResult.Success) {
                     successCount++
                 } else {
                     failCount++
                 }
-
-                _signInState.update {
-                    it.copy(
-                        currentProgress = index + 1,
-                        successCount = successCount,
-                        failCount = failCount
-                    )
-                }
             }
 
             _signInState.update {
-                it.copy(isSigningIn = false)
+                it.copy(
+                    isSigningIn = false,
+                    currentProgress = results.size,
+                    successCount = successCount,
+                    failCount = failCount
+                )
             }
         }
     }
